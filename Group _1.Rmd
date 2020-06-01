@@ -1,0 +1,432 @@
+---
+title: "Group 1"
+author: "Joseph Lynch and Anand Taxali"
+date: "5/31/2020"
+output: html_document
+---
+
+
+```{r}
+
+#Problem 1
+
+
+#Standardize all variables (including the response variable "strength"). Split the data set
+#into a training set (60%) and a validation set (40%)
+concreteData.df <- read.csv("C:/Users/Administrator/Documents/concrete.csv")
+concreteData.df <- scale(concreteData.df, center=TRUE, scale=TRUE)
+#
+set.seed(1)  # set seed for reproducing the partition
+train.index <- sample(c(1:1000), 618)  
+concreteDataTest.df <- concreteData.df[train.index, ]
+concreteDataValidation.df <- concreteData.df[-train.index, ]
+
+```{r}
+
+#Implement the gradient descent algorithm in R with the ordinary least square cost
+#function. 
+
+
+# Y vector
+Y <- as.matrix(concreteDataTest.df[,9]/618)
+#construct X matrix
+X1 <- as.matrix(concreteDataTest.df[,c(1,2,3,4,5,6,7,8)])
+
+#X transpose
+X1T <- t(X1)
+# coefficeints b =(XT X)^-1 XT Y
+b1 <- solve(X1T%*%X1)%*%(X1T%*%Y)
+b1
+
+
+Jcost <- function(X1, y, b){
+  m <- length(y)
+  return((t(X1%*%b-y))%*%(X1%*%b-y)/(2*m))
+}
+length(X1)
+X<- as.matrix(concreteDataTest.df[,c(1,2,3,4,5,6,7,8)])
+X[,1] <-(X[,1] - mean(X[,1]))/sd(X[,1])
+X[,2] <-(X[,2] - mean(X[,2]))/sd(X[,2])
+X[,3] <-(X[,3] - mean(X[,3]))/sd(X[,3])
+X[,4] <-(X[,4] - mean(X[,4]))/sd(X[,4])
+X[,5] <-(X[,5] - mean(X[,5]))/sd(X[,5])
+X[,6] <-(X[,6] - mean(X[,6]))/sd(X[,6])
+X[,7] <-(X[,7] - mean(X[,7]))/sd(X[,7])
+X[,8] <-(X[,8] - mean(X[,8]))/sd(X[,8])
+Y <- as.matrix(concreteDataTest.df[,9])/618
+
+niter <- 400
+J_history<-0
+
+alpha <- 0.3
+b0 <- as.matrix(c(0,0,0,0,0,0,0,0))
+brun <- b0
+m = length(Y)
+
+for (iter in 1:niter){
+  brun = b0 + alpha*t(t(Y-X%*%b0)%*%X)/m
+  J_history[iter] <- Jcost(X,Y,brun)
+  #  print(J_history[iter])
+  b0 = brun
+}
+b0
+plot(J_history[1:600], col = "blue", xlab = "No. of Iteration", ylab = "Jcost",
+     xlim=c(1,100), ylim = c(0,.000001), main = "Least square cost function vs. iteration step")
+
+
+
+#Apply the fitted regression model to the validation set and evaluate the model
+#performance (ME, RMSE, MAE, MPE, MPAE). Calculate the correlation between the
+#predicted strength and the actual strength. Create a lift chart to show model
+#performance.
+
+
+concreteDataTest.df<- data.frame(concreteDataTest.df)
+concreteDataValidation.df <- data.frame(concreteDataValidation.df)
+
+concreteDataTestRegression <- lm(concreteDataTest.df$strength ~ ., data = concreteDataTest.df)
+
+
+Prediction <- predict(concreteDataTestRegression, concreteDataValidation.df)
+options(scipen=999, digits = 0)
+
+library(forecast)
+accuracy(Prediction, concreteDataValidation.df$strength)
+options(scipen=999, digits = 10)
+
+
+cor(Prediction,concreteDataValidation.df$strength)
+
+library(gains)
+gain <- gains(concreteDataValidation.df$strength, Prediction)
+options(scipen=999)
+
+plot(c(0,gain$cume.pct.of.total*sum(concreteDataValidation.df$strength))~c(0,gain$cume.obs), 
+     xlab = "# cases", ylab = "Strength", main = "Lift Chart", type = "l")
+lines(c(0,sum(concreteDataValidation.df$strength))~c(0,dim(concreteDataValidation.df)[1]), col = "gray", lty = 2)
+
+```{r}
+
+#Problem 2
+library(readxl)
+library(car)
+library(bootstrap)
+SlumpTestData <- read_excel("C:/Users/Administrator/Documents/Concrete Slump Test Data.xlsx")
+
+
+#Create a scatterplot matrix of “Concrete Slump Test Data” and select an initial set of
+#predictor variables
+
+
+#Removing the observation numbers from the analysis
+SlumpTestData[,-1]
+cor(SlumpTestData[,-1])
+scatterplotMatrix(cor(SlumpTestData[,-1]),pch=19)
+
+
+#We can see clearly that Slump and Slump flow are highly correlated, but these are both considered response attributes per the data description. 
+#
+
+
+#Build a few potential regression models using “Concrete Slump Test Data”
+
+AllPredictorsRegression <- lm(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+                              +SlumpTestData$Slag+SlumpTestData$`Fly Ash`+SlumpTestData$Water+SlumpTestData$SP+SlumpTestData$`Coarse Aggregate`+SlumpTestData$`Fine Aggregate`,data = SlumpTestData)
+
+summary(AllPredictorsRegression)
+
+FourPredictorsRegression <- lm(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+                              +SlumpTestData$Water+SlumpTestData$`Coarse Aggregate`+SlumpTestData$`Fine Aggregate`,data = SlumpTestData)
+summary(FourPredictorsRegression)
+
+TwoPredictorsRegression <- lm(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+                               +SlumpTestData$Water,data = SlumpTestData)
+
+summary(TwoPredictorsRegression)
+
+
+
+
+```{r}
+
+#Perform regression diagnostics using both typical approach and enhanced approach
+
+#Typical
+library(MASS)
+par(mfrow = c(2, 2))
+plot(AllPredictorsRegression)
+
+# We can see from the Normal Q-Q graph that the assumption of normality is met here
+# The Scale-Location plot demonstrates that we've met the assumption of homoscedasticity
+
+
+#Enhanced
+
+#Normality
+qqPlot(AllPredictorsRegression, labels = row.names(SlumpTestData[,-1]), id.method = "identify",
+       simulate = TRUE, main = "Q-Q Plot")
+
+#Independence
+durbinWatsonTest(AllPredictorsRegression)
+
+#homoscedasticity
+spreadLevelPlot(AllPredictorsRegression)
+ncvTest(AllPredictorsRegression)
+
+#We can see from the Q-Q plot that we've met the assumption of normality and from the Spread level plot that 
+#we've met the assumption of homoscedasticity. We do not see autocorrelation based on the durbinWatsonTest so we have independence of errors.
+
+
+```{r}
+
+
+#Identify unusual observations and take corrective measures
+
+outlierTest(AllPredictorsRegression)
+
+#The test does not return any unusual observations from the dataset
+
+
+anova(FourPredictorsRegression,AllPredictorsRegression)
+anova(TwoPredictorsRegression,AllPredictorsRegression)
+
+#We see in both cases that the p-value from analysis of variance is not large, so we do not drop the variables from our model
+
+```{r}
+
+#Select the best regression model
+
+stepAIC(AllPredictorsRegression, direction = "backward")
+
+library(leaps)
+leaps <- regsubsets(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+                    +SlumpTestData$Slag+SlumpTestData$`Fly Ash`+SlumpTestData$Water+SlumpTestData$SP+SlumpTestData$`Coarse Aggregate`+SlumpTestData$`Fine Aggregate`,data = SlumpTestData,nbest=4)
+plot(leaps, scale = "adjr2")
+
+#The leaps plot recommends that the two predictors combined by themselves(Slag and Water) have the highest adjusted R^2 of .49
+
+
+```{r}
+
+#Fine tune the selection of predictor variables
+
+shrinkage <- function(fit, k=10){
+  require(bootstrap)
+  theta.fit <- function(x,y){lsfit(x,y)}
+  theta.predict <- function(fit,x){cbind(1,x)%*%fit$coef}
+  x <- fit$model[,2:ncol(fit$model)]
+  y <- fit$model[,1]
+  results <- crossval(x, y, theta.fit, theta.predict, ngroup=k)
+  r2 <- cor(y, fit$fitted.values)^2
+  r2cv <- cor(y, results$cv.fit)^2
+  cat("Original R-square =", r2, "\n")
+  cat(k, "Fold Cross-Validated R-square =", r2cv, "\n")
+  cat("Change =", r2-r2cv, "\n")
+}
+shrinkage(AllPredictorsRegression)
+
+
+
+SixFit <- lm(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+              +SlumpTestData$Water+SlumpTestData$`Fly Ash`+SlumpTestData$SP+SlumpTestData$`Coarse Aggregate`+SlumpTestData$`Fine Aggregate`,data = SlumpTestData)
+shrinkage(SixFit)
+
+FiveFit <- lm(SlumpTestData$`Slump Flow`~SlumpTestData$Cement
+              +SlumpTestData$Water+SlumpTestData$`Fly Ash`+SlumpTestData$`Coarse Aggregate`+SlumpTestData$`Fine Aggregate`,data = SlumpTestData)
+
+shrinkage(FiveFit)
+
+#We can see that the model with only five variables instead of every variable has a higher cross-validaded R-squared score
+
+#Interpret the prediction results
+summary(FiveFit)
+
+# Below is the closest model fit to the actual data
+# y= -249.50866 + .05366*(Cement) + .72313*(Water) + .06101 * (Fly Ash) + .07291 *(Coarse Aggregate) + .09554 *(Fine Aggregate)
+
+```{r}
+
+
+#Problem 3
+
+#Prior to building a regression model, it is often helpful to check for normality. Although
+#linear regression does not strictly require a normally distributed dependent variable, the
+#model often fits better when this is true. Look at the summary statistics and draw the
+#histogram of the dependent variable. Comment on the result
+
+Insurance <- read.csv("C:/Users/Administrator/Documents/insurance.csv", stringsAsFactors = TRUE )
+
+str(Insurance)
+summary(Insurance)
+
+hist(Insurance$charges, xlab="Charges")
+hist(log(Insurance$charges), xlab="Charges")
+
+Insurance$charges <- log(Insurance$charges)
+
+#We can see from the histogram that the charges data is skewed to the far right in the first histogram
+
+```{r}
+
+
+#Create a correlation matrix and a scatterplot matrix for the four numeric variables in the
+#insurance data frame. Do you notice any patterns in these plots in the scatterplot matrix?
+
+scatterplotMatrix(cor(Insurance[,c(1,3,4,7)]),pch=19)
+
+scatterplotMatrix(Insurance[,c(1,3,4,7)],pch=19)
+
+#There is a strong positive correlation between charges and age
+
+```{r}
+
+#Build a regression model using the independent variables, then evaluate the model
+#performance.
+
+
+AllVarsRegModel <- lm(Insurance$charges ~ Insurance$age+Insurance$sex+Insurance$BMI+Insurance$children+Insurance$smoker+Insurance$region,data=Insurance) 
+summary(AllVarsRegModel)
+
+#The model that incorporates all of the variables has an adjusted R^2 of 76.66% 
+
+
+```{r}
+
+#Perform regression diagnostics using both typical approach and enhanced approach
+
+#Typical
+library(MASS)
+par(mfrow = c(2, 2))
+plot(AllVarsRegModel)
+
+# We can see from the Normal Q-Q graph that the assumption of normality is not met here as the data does not follow the 45 degree line but skews
+# The Scale-Location plot demonstrates that we've met the assumption of homoscedasticity
+
+
+
+```{r}
+
+#Enhanced
+
+#Normality
+qqPlot(AllVarsRegModel, labels = row.names(Insurance), id.method = "identify",
+       simulate = TRUE, main = "Q-Q Plot")
+#Independence
+durbinWatsonTest(AllVarsRegModel)
+
+#A not significant pvalue(.368) means that there is a lack of autocorrelation
+
+#homoscedasticity
+spreadLevelPlot(AllVarsRegModel)
+ncvTest(AllVarsRegModel)
+
+#We can see from the Q-Q plot that we've met the assumption of normality and from the Spread level plot that 
+#we've met the assumption of homoscedasticity. We do not see autocorrelation based on the durbinWatsonTest so we have indepence of errors.
+
+
+```{r}
+
+#Improve the regression model by adding a non-linear term for age and creating an
+#indicator for obesity. Assume that BMI is strongly related to higher costs for the obese
+#(that is, BMI of 30 or above), but has zero impact on medical expenditures for
+#individuals in the normal weight range. Compare the results with the part (c).
+
+Insurance$ObesityInd <- rep("no", 1338)
+for(i in 1:1338) {if (Insurance$BMI[i] > 30) Insurance$ObesityInd[i] <- "yes"}
+Insurance$ObesityInd <- as.factor(Insurance$ObesityInd)
+
+
+UpdatedModel <- lm(formula=Insurance$charges ~ Insurance$age+(Insurance$age)^2+Insurance$sex+Insurance$BMI+Insurance$ObesityInd+Insurance$children+Insurance$smoker+Insurance$region,data=Insurance) 
+summary(UpdatedModel)
+
+#We can see an increased Adjusted R^2 value in comparison to the part C here after incorporating the non-linear age #term and obesity indicator
+
+```{r}
+
+#Problem 4
+
+
+#Create a scatterplot matrix of “Forest Fire Data” and select an initial set of predictor
+#variables
+
+library(readxl)
+ForestFireTestData <- read_excel("C:/Users/Administrator/Documents/Forest Fires Data.xlsx")
+str(ForestFireTestData)
+
+
+
+#Convert the months into seasonal data through a for loop
+
+ForestFireTestData$Season <- rep("fall", 517)
+for(i in 1:270) {if (ForestFireTestData$Month[i] %in% c("dec", "jan", "feb")) ForestFireTestData$Season[i] <- "winter"
+if (ForestFireTestData$Month[i] %in% c("jul", "jun", "aug")) ForestFireTestData$Season[i] <- "summer"
+if (ForestFireTestData$Month[i] %in% c("mar", "apr", "may")) ForestFireTestData$Season[i] <- "spring"}
+ForestFireTestData$Season <- as.factor(ForestFireTestData$Season)
+ForestFireTestData$Month <- NULL
+
+scatterplotMatrix(ForestFireTestData[, 4:12], spread=FALSE, main = "Scatter Plot Matrix")
+
+
+#Build a few potential regression models using “Forest Fire Data”
+
+FirstModel <- lm(ForestFireTestData$Area ~ForestFireTestData$FFMC+ForestFireTestData$DMC+ForestFireTestData$DC+ForestFireTestData$ISI, data = ForestFireTestData)
+
+summary(FirstModel)
+
+SecondModel <- lm(ForestFireTestData$Area ~(ForestFireTestData$FFMC+ForestFireTestData$DMC+ForestFireTestData$DC+ForestFireTestData$ISI)^2, data = ForestFireTestData)
+summary(SecondModel)
+
+#The meteorological conditions are likely not independent, model generates higher R^2 values when variables are squared
+
+```{r}
+
+#Perform regression diagnostics using both typical approach and enhanced approach
+
+#Typical
+par(mfrow = c(2,2))
+plot(SecondModel)
+
+#Enhanced
+
+#Normality
+qqPlot(SecondModel, labels = row.names(ForestFireTestData), id.method = "identify", simulate = TRUE, main = "Q-Q
+Plot")
+
+#Based on the above qqplot this dataset does not strongly meet the normality assumption
+
+
+#Independence
+durbinWatsonTest(SecondModel)
+#The observations based on the low p value signify that a few observations may not be independent. 
+
+#Linearity
+crPlots(FirstModel)
+
+#homoscedasticity.
+ncvTest(SecondModel)
+par(mfrow = c(1,1))
+spreadLevelPlot(SecondModel)
+
+```{r}
+
+#Identify unusual observations and take corrective measures
+
+outlierTest(SecondModel)
+par(mfrow=c(1,1))
+outliers <- influencePlot(SecondModel, id.method = "identify", main = "Influence plot")
+outliers
+
+ForestFireTestData <- ForestFireTestData[-c(239,416,480),]
+
+#Select the best regression model
+FinalModel <- lm(ForestFireTestData$Area ~(ForestFireTestData$FFMC+ForestFireTestData$DMC+ForestFireTestData$DC+ForestFireTestData$ISI)^2, data = ForestFireTestData)
+
+#Fine tune the selection of predictor variables
+FinalModel<- stepAIC(FinalModel, direction = "backward")
+summary(FinalModel)
+
+#Interpret the prediction results
+#Below is the closest model fit to the actual data
+#Area= .02953*(DMC)
+
+
